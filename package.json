@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "update-types": "npx supabase gen types typescript --project-id jvjxgxleyevmudgojziv > src/types/supabase.ts",
     "lint": "eslint"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "supabase": "^2.91.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

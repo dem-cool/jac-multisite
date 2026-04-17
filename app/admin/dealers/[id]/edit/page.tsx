@@ -13,14 +13,20 @@ function getContactField(contact: Json | null, key: string): string {
   return typeof value === 'string' ? value : ''
 }
 
-interface PageProps {
-  params: Promise<{ id: string }>
+function str(v: string | string[] | undefined): string {
+  return typeof v === 'string' ? v : ''
 }
 
-export default async function EditDealerPage({ params }: PageProps) {
+interface PageProps {
+  params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function EditDealerPage({ params, searchParams }: PageProps) {
   await requireRole(['superadmin'])
 
   const { id } = await params
+  const sp = await searchParams
 
   const supabase = createAdminClient()
   const { data: dealer, error } = await supabase
@@ -44,20 +50,25 @@ export default async function EditDealerPage({ params }: PageProps) {
     const address = (formData.get('address') as string | null)?.trim() ?? ''
 
     const editUrl = `/admin/dealers/${id}/edit`
+    const values = { name, slug, email, phone, address }
+    const errorRedirect = (message: string) => {
+      const params = new URLSearchParams({ error: message, ...values })
+      redirect(`${editUrl}?${params.toString()}`)
+    }
 
-    if (!name || !slug) return redirect(`${editUrl}?error=name`)
+    if (!name || !slug) return errorRedirect('Name is required')
     if (!SLUG_RE.test(slug)) {
-      return redirect(`${editUrl}?error=${encodeURIComponent('Slug must only contain lowercase letters, digits, and hyphens')}`)
+      return errorRedirect('Slug must only contain lowercase letters, digits, and hyphens')
     }
 
     const supabase = createAdminClient()
 
     const { data: current } = await supabase.from('dealers').select('slug').eq('id', id).single()
     if (current?.slug === 'importer' && slug !== 'importer') {
-      return redirect(`${editUrl}?error=${encodeURIComponent('Cannot rename the importer tenant')}`)
+      return errorRedirect('Cannot rename the importer tenant')
     }
     if (current?.slug !== 'importer' && slug === 'importer') {
-      return redirect(`${editUrl}?error=${encodeURIComponent('Slug "importer" is reserved')}`)
+      return errorRedirect('Slug "importer" is reserved')
     }
 
     const { error: updateError } = await supabase
@@ -69,7 +80,7 @@ export default async function EditDealerPage({ params }: PageProps) {
       })
       .eq('id', id)
 
-    if (updateError) return redirect(`${editUrl}?error=${encodeURIComponent(updateError.message)}`)
+    if (updateError) return errorRedirect(updateError.message)
 
     redirect('/admin/dealers')
   }
@@ -94,9 +105,12 @@ export default async function EditDealerPage({ params }: PageProps) {
     redirect('/admin/dealers')
   }
 
-  const email = getContactField(dealer.contact_json, 'email')
-  const phone = getContactField(dealer.contact_json, 'phone')
-  const address = getContactField(dealer.contact_json, 'address')
+  const errorMessage = str(sp.error)
+  const name = sp.name !== undefined ? str(sp.name) : dealer.name
+  const slug = sp.slug !== undefined ? str(sp.slug) : dealer.slug
+  const email = sp.email !== undefined ? str(sp.email) : getContactField(dealer.contact_json, 'email')
+  const phone = sp.phone !== undefined ? str(sp.phone) : getContactField(dealer.contact_json, 'phone')
+  const address = sp.address !== undefined ? str(sp.address) : getContactField(dealer.contact_json, 'address')
 
   return (
     <main className="mx-auto max-w-lg px-4 py-12">
@@ -105,48 +119,18 @@ export default async function EditDealerPage({ params }: PageProps) {
       </div>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Edit Dealer</h1>
 
+      {errorMessage && (
+        <div className="mb-5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300">
+          {errorMessage}
+        </div>
+      )}
+
       <form action={updateDealer} className="space-y-5">
-        <FormField
-          id="name"
-          name="name"
-          type="text"
-          required
-          defaultValue={dealer.name}
-          label="Dealer Name"
-        />
-
-        <FormField
-          id="slug"
-          name="slug"
-          type="text"
-          defaultValue={dealer.slug}
-          label="Slug"
-          hint="Leave blank to auto-generate from name"
-        />
-
-        <FormField
-          id="email"
-          name="email"
-          type="email"
-          defaultValue={email}
-          label="Contact Email"
-        />
-
-        <FormField
-          id="phone"
-          name="phone"
-          type="tel"
-          defaultValue={phone}
-          label="Phone"
-        />
-
-        <FormField
-          id="address"
-          name="address"
-          type="text"
-          defaultValue={address}
-          label="Address"
-        />
+        <FormField id="name" name="name" type="text" required defaultValue={name} label="Dealer Name" />
+        <FormField id="slug" name="slug" type="text" defaultValue={slug} label="Slug" hint="Leave blank to auto-generate from name" />
+        <FormField id="email" name="email" type="email" defaultValue={email} label="Contact Email" />
+        <FormField id="phone" name="phone" type="tel" defaultValue={phone} label="Phone" />
+        <FormField id="address" name="address" type="text" defaultValue={address} label="Address" />
 
         <button
           type="submit"

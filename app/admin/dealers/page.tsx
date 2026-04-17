@@ -24,15 +24,11 @@ export default async function DealersPage() {
         </Link>
       </div>
 
-      {error && (
+      {error ? (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400">Failed to load dealers: {error.message}</p>
-      )}
-
-      {dealers && dealers.length === 0 && (
+      ) : !dealers?.length ? (
         <p className="text-sm text-neutral-500">No dealers yet. Add one to get started.</p>
-      )}
-
-      {dealers && dealers.length > 0 && (
+      ) : (
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 dark:bg-neutral-800">

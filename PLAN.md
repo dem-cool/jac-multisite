@@ -11,20 +11,37 @@ Say `"do M01"` (or any module number). Claude will:
 
 ---
 
+## Domain model — importer vs dealer
+
+**Importer (marka / centrala)** is served on the **apex (root) host** of the brand domain — there is **no** public `importer.example.com` URL in this product.
+
+| Role | Example URL | How proxy picks tenant |
+|------|-------------|-------------------------|
+| Importer | `https://jacpolska.pl` | Apex host (`host` has only `brand.tld`); tenant slug defaults to `importer` in DB |
+| Dealer | `https://dealer-krakow.jacpolska.pl` | First DNS label is the dealer `slug` |
+
+The row in `dealers` with `slug = 'importer'` is the **technical tenant id** for the brand site on the apex; marketing URLs stay on the root domain, not on an `importer.*` subdomain.
+
+**DNS / Vercel:** apex + wildcard `*.jacpolska.pl` (or equivalent) so every dealer subdomain hits the same deployment.
+
+---
+
 ## Dev Subdomain Workaround
 
-**Localhost** — use `lvh.me` (all subdomains → `127.0.0.1`, zero config):
+**Localhost** — use `lvh.me` (all subdomains → `127.0.0.1`, zero config). Match production: **apex = importer**, **subdomain = dealer**:
 
 ```
-http://importer.lvh.me:3000
-http://dealer-krakow.lvh.me:3000
+http://lvh.me:3000                    → importer (same rule as jacpolska.pl)
+http://dealer-krakow.lvh.me:3000      → dealer
 ```
+
+(Optional: `http://importer.lvh.me:3000` still resolves to the `importer` tenant via subdomain, but production does not use that pattern — prefer apex locally too.)
 
 **Vercel free tier** — no wildcard domains. Proxy falls back to:
 
 1. `__dealer` cookie — set by visiting `/dev/set-dealer/[slug]`
 2. `?_dealer=slug` query param
-3. Root → importer tenant
+3. Apex / two-label host → importer tenant (`slug` `importer`)
 
 ---
 
@@ -32,8 +49,8 @@ http://dealer-krakow.lvh.me:3000
 
 ### Supabase dashboard (do before M01)
 
-- [ ] Auth → Site URL → `http://lvh.me:3000`
-- [ ] Auth → Redirect URLs → add `http://*.lvh.me:3000/**`
+- [ ] Auth → Site URL → `http://lvh.me:3000` (apex = importer)
+- [ ] Auth → Redirect URLs → add `http://*.lvh.me:3000/**` (dealer subdomains + optional `importer.lvh.me` if used)
 - [ ] Auth → Email Templates → customize invite email (before M05)
 - [ ] Auth → SMTP Settings → set custom SMTP to avoid 3/hr free limit (before M03)
 
@@ -103,7 +120,7 @@ End: run `npm run update-types`
 
 Files to create:
 
-- `proxy.ts` — parse tenant (subdomain → cookie → query param → importer fallback); inject `x-dealer-slug` header; return 404 for unknown slugs
+- `proxy.ts` — parse tenant (dealer subdomain if `*.brand.tld` → else cookie → query param → apex defaults to importer slug); inject `x-dealer-slug` header; return 404 for unknown slugs
 - `lib/dealer.ts` — `getDealerBySlug(slug)` using service role client
 - `lib/dealer-context.ts` — `getDealerFromHeaders()` reads `x-dealer-slug` in server components
 - `app/dev/set-dealer/[slug]/route.ts` — sets `__dealer` cookie, redirects to `/`
@@ -137,7 +154,7 @@ Proxy config: matcher excludes `_next/static`, `_next/image`, `favicon.ico`, `pu
 
 Seed (new migration file):
 
-- Insert dealer: `importer` (slug: `importer`, name: `JAC Motors Poland`)
+- Insert dealer: `importer` (slug: `importer`, name: `JAC Motors Poland`) — tenant for **apex** brand site (e.g. `jacpolska.pl`), not a public `importer.*` hostname
 - Insert dealer: `dealer-krakow` (slug: `dealer-krakow`, name: `JAC Kraków`)
 
 Components:
@@ -241,8 +258,8 @@ Env vars: `RESEND_API_KEY`, `NEXT_PUBLIC_RECAPTCHA_KEY`, `RECAPTCHA_SECRET_KEY`
 - `scripts/test-rls.ts` — signs in as dealer A admin, reads posts where dealer_id = dealer B's id, asserts empty result
 - Push migrations to prod: `supabase db push --project-ref jvjxgxleyevmudgojziv`
 - Smoke checklist:
-  - [ ] `importer.yourdomain.com` loads with importer footer
-  - [ ] `dealer-krakow.yourdomain.com` loads with dealer footer
+  - [ ] Apex `https://yourdomain.com` (or `jacpolska.pl`) loads importer footer — not `importer.yourdomain.com`
+  - [ ] `https://dealer-krakow.yourdomain.com` loads dealer footer
   - [ ] Login → dealer admin → create post → visible on public blog
   - [ ] Form submit → submission in DB → email delivered
   - [ ] Decline cookies → no GTM/GA scripts load

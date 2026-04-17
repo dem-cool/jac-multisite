@@ -1,19 +1,26 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { getDealerBySlug } from './lib/dealer'
 
 const SLUG_RE = /^[a-z0-9-]+$/
 
-function getAccessToken(request: NextRequest): string | null {
-  for (const cookie of request.cookies.getAll()) {
-    if (cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')) {
-      try {
-        const parsed = JSON.parse(cookie.value)
-        // Supabase SSR stores it as [access_token, refresh_token] or as an object
-        if (Array.isArray(parsed)) return parsed[0]
-        if (parsed?.access_token) return parsed.access_token
-      } catch {}
-    }
+async function checkAuth(request: NextRequest, allowedRoles: string[]): Promise<NextResponse | null> {
+  const tmp = NextResponse.next()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cs) => cs.forEach(({ name, value, options }) => tmp.cookies.set(name, value, options)),
+      },
+    },
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.app_metadata?.role
+  if (!role || !allowedRoles.includes(role)) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
   return null
 }
@@ -22,6 +29,18 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0]
   const parts = hostname.split('.')
+
+  const { pathname } = request.nextUrl
+  const needsAdmin = pathname.startsWith('/admin')
+  const needsDashboard = pathname.startsWith('/dashboard')
+
+  if (needsAdmin || needsDashboard) {
+    const redirect = await checkAuth(
+      request,
+      needsAdmin ? ['superadmin'] : ['dealer_admin', 'superadmin'],
+    )
+    if (redirect) return redirect
+  }
 
   let slug: string
   let fromSubdomain = false
@@ -35,11 +54,7 @@ export async function proxy(request: NextRequest) {
       slug = dealerCookie.value
     } else {
       const dealerParam = request.nextUrl.searchParams.get('_dealer')
-      if (dealerParam) {
-        slug = dealerParam
-      } else {
-        slug = 'importer'
-      }
+      slug = dealerParam ?? 'importer'
     }
   }
 
@@ -47,57 +62,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: 'Unknown tenant' }, { status: 404 })
   }
 
-  const { pathname } = request.nextUrl
-
-  // Protect /admin/* — require superadmin
-  if (pathname.startsWith('/admin')) {
-    const token = getAccessToken(request)
-      ?? request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      if (payload?.app_metadata?.role !== 'superadmin') {
-        return NextResponse.redirect(new URL('/login', request.url))
-      }
-    } catch {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-
-  // Protect /dashboard/* — require dealer_admin or superadmin
-  if (pathname.startsWith('/dashboard')) {
-    const token = getAccessToken(request)
-      ?? request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      const role = payload?.app_metadata?.role
-      if (role !== 'dealer_admin' && role !== 'superadmin') {
-        return NextResponse.redirect(new URL('/login', request.url))
-      }
-    } catch {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-
   const dealer = await getDealerBySlug(slug)
-
-  if (!dealer) {
-    // importer is the root-tenant fallback — pass through even if not seeded yet
-    if (slug === 'importer' && !fromSubdomain) {
-      const requestHeaders = new Headers(request.headers)
-      requestHeaders.set('x-dealer-slug', slug)
-      return NextResponse.next({ request: { headers: requestHeaders } })
-    }
+  const isImporterFallback = !dealer && slug === 'importer' && !fromSubdomain
+  if (!dealer && !isImporterFallback) {
     return NextResponse.json({ error: 'Unknown tenant' }, { status: 404 })
   }
 
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-dealer-slug', dealer.slug)
+  requestHeaders.set('x-dealer-slug', dealer?.slug ?? slug)
 
   return NextResponse.next({ request: { headers: requestHeaders } })
 }

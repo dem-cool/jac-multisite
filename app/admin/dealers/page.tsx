@@ -13,6 +13,7 @@ export default async function DealersPage() {
   const { data: dealers, error } = await supabase
     .from('dealers')
     .select('id, slug, name, contact_json, created_at')
+    .neq('slug', 'importer')
     .order('name')
 
   return (

@@ -1,15 +1,11 @@
 import { requireRole } from '@/lib/auth'
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from '@/src/types/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
 import Link from 'next/link'
 
 export default async function DealersPage() {
   await requireRole(['superadmin'])
 
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const supabase = createAdminClient()
   const { data: dealers, error } = await supabase
     .from('dealers')
     .select('id, slug, name, contact_json, created_at')

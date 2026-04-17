@@ -1,18 +1,11 @@
 import { requireRole } from '@/lib/auth'
-import { createClient } from '@supabase/supabase-js'
-import type { Database, Json } from '@/src/types/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { SLUG_RE, toSlug } from '@/lib/slug'
+import type { Json } from '@/src/types/supabase'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import FormField from '@/components/admin/FormField'
 import DeleteDealerButton from '../DeleteDealerButton'
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/[\s]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
 
 function getContactField(contact: Json | null, key: string): string {
   if (!contact || typeof contact !== 'object' || Array.isArray(contact)) return ''
@@ -29,7 +22,7 @@ export default async function EditDealerPage({ params }: PageProps) {
 
   const { id } = await params
 
-  const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const supabase = createAdminClient()
   const { data: dealer, error } = await supabase
     .from('dealers')
     .select('*')
@@ -44,14 +37,29 @@ export default async function EditDealerPage({ params }: PageProps) {
     await requireRole(['superadmin'])
 
     const name = (formData.get('name') as string | null)?.trim() ?? ''
-    const slug = (formData.get('slug') as string | null)?.trim() || toSlug(name)
+    const rawSlug = (formData.get('slug') as string | null)?.trim() ?? ''
+    const slug = rawSlug || toSlug(name)
     const email = (formData.get('email') as string | null)?.trim() ?? ''
     const phone = (formData.get('phone') as string | null)?.trim() ?? ''
     const address = (formData.get('address') as string | null)?.trim() ?? ''
 
-    if (!name || !slug) return redirect(`/admin/dealers/${id}/edit?error=name`)
+    const editUrl = `/admin/dealers/${id}/edit`
 
-    const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    if (!name || !slug) return redirect(`${editUrl}?error=name`)
+    if (!SLUG_RE.test(slug)) {
+      return redirect(`${editUrl}?error=${encodeURIComponent('Slug must only contain lowercase letters, digits, and hyphens')}`)
+    }
+
+    const supabase = createAdminClient()
+
+    const { data: current } = await supabase.from('dealers').select('slug').eq('id', id).single()
+    if (current?.slug === 'importer' && slug !== 'importer') {
+      return redirect(`${editUrl}?error=${encodeURIComponent('Cannot rename the importer tenant')}`)
+    }
+    if (current?.slug !== 'importer' && slug === 'importer') {
+      return redirect(`${editUrl}?error=${encodeURIComponent('Slug "importer" is reserved')}`)
+    }
+
     const { error: updateError } = await supabase
       .from('dealers')
       .update({
@@ -61,7 +69,7 @@ export default async function EditDealerPage({ params }: PageProps) {
       })
       .eq('id', id)
 
-    if (updateError) return redirect(`/admin/dealers/${id}/edit?error=${encodeURIComponent(updateError.message)}`)
+    if (updateError) return redirect(`${editUrl}?error=${encodeURIComponent(updateError.message)}`)
 
     redirect('/admin/dealers')
   }
@@ -71,7 +79,7 @@ export default async function EditDealerPage({ params }: PageProps) {
 
     await requireRole(['superadmin'])
 
-    const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const supabase = createAdminClient()
 
     const { data: target } = await supabase.from('dealers').select('slug').eq('id', id).single()
     if (target?.slug === 'importer') return redirect(`/admin/dealers/${id}/edit?error=Cannot+delete+the+importer+tenant`)
@@ -93,69 +101,52 @@ export default async function EditDealerPage({ params }: PageProps) {
   return (
     <main className="mx-auto max-w-lg px-4 py-12">
       <div className="mb-8">
-        <a href="/admin/dealers" className="text-sm text-neutral-500 hover:underline">&larr; Back to Dealers</a>
+        <Link href="/admin/dealers" className="text-sm text-neutral-500 hover:underline">&larr; Back to Dealers</Link>
       </div>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Edit Dealer</h1>
 
       <form action={updateDealer} className="space-y-5">
-        <div className="space-y-1.5">
-          <label htmlFor="name" className="text-sm font-medium text-foreground">
-            Dealer Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            required
-            defaultValue={dealer.name}
-            className="w-full rounded-md border border-neutral-300 bg-background px-3 py-2 text-foreground outline-none ring-offset-background transition-[color,box-shadow] focus-visible:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:border-neutral-600 dark:focus-visible:border-neutral-500"
-          />
-        </div>
+        <FormField
+          id="name"
+          name="name"
+          type="text"
+          required
+          defaultValue={dealer.name}
+          label="Dealer Name"
+        />
 
-        <div className="space-y-1.5">
-          <label htmlFor="slug" className="text-sm font-medium text-foreground">Slug</label>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            defaultValue={dealer.slug}
-            className="w-full rounded-md border border-neutral-300 bg-background px-3 py-2 text-foreground outline-none ring-offset-background transition-[color,box-shadow] focus-visible:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:border-neutral-600 dark:focus-visible:border-neutral-500"
-          />
-          <p className="text-xs text-neutral-500">Leave blank to auto-generate from name</p>
-        </div>
+        <FormField
+          id="slug"
+          name="slug"
+          type="text"
+          defaultValue={dealer.slug}
+          label="Slug"
+          hint="Leave blank to auto-generate from name"
+        />
 
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-foreground">Contact Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            defaultValue={email}
-            className="w-full rounded-md border border-neutral-300 bg-background px-3 py-2 text-foreground outline-none ring-offset-background transition-[color,box-shadow] focus-visible:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:border-neutral-600 dark:focus-visible:border-neutral-500"
-          />
-        </div>
+        <FormField
+          id="email"
+          name="email"
+          type="email"
+          defaultValue={email}
+          label="Contact Email"
+        />
 
-        <div className="space-y-1.5">
-          <label htmlFor="phone" className="text-sm font-medium text-foreground">Phone</label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            defaultValue={phone}
-            className="w-full rounded-md border border-neutral-300 bg-background px-3 py-2 text-foreground outline-none ring-offset-background transition-[color,box-shadow] focus-visible:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:border-neutral-600 dark:focus-visible:border-neutral-500"
-          />
-        </div>
+        <FormField
+          id="phone"
+          name="phone"
+          type="tel"
+          defaultValue={phone}
+          label="Phone"
+        />
 
-        <div className="space-y-1.5">
-          <label htmlFor="address" className="text-sm font-medium text-foreground">Address</label>
-          <input
-            id="address"
-            name="address"
-            type="text"
-            defaultValue={address}
-            className="w-full rounded-md border border-neutral-300 bg-background px-3 py-2 text-foreground outline-none ring-offset-background transition-[color,box-shadow] focus-visible:border-neutral-500 focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:border-neutral-600 dark:focus-visible:border-neutral-500"
-          />
-        </div>
+        <FormField
+          id="address"
+          name="address"
+          type="text"
+          defaultValue={address}
+          label="Address"
+        />
 
         <button
           type="submit"

@@ -15,10 +15,10 @@ Say `"do M01"` (or any module number). Claude will:
 
 **Importer (marka / centrala)** is served on the **apex (root) host** of the brand domain — there is **no** public `importer.example.com` URL in this product.
 
-| Role | Example URL | How proxy picks tenant |
-|------|-------------|-------------------------|
-| Importer | `https://jacpolska.pl` | Apex host (`host` has only `brand.tld`); tenant slug defaults to `importer` in DB |
-| Dealer | `https://dealer-krakow.jacpolska.pl` | First DNS label is the dealer `slug` |
+| Role     | Example URL                          | How proxy picks tenant                                                            |
+| -------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| Importer | `https://jacpolska.pl`               | Apex host (`host` has only `brand.tld`); tenant slug defaults to `importer` in DB |
+| Dealer   | `https://dealer-krakow.jacpolska.pl` | First DNS label is the dealer `slug`                                              |
 
 The row in `dealers` with `slug = 'importer'` is the **technical tenant id** for the brand site on the apex; marketing URLs stay on the root domain, not on an `importer.*` subdomain.
 
@@ -130,6 +130,7 @@ Proxy config: matcher excludes `_next/static`, `_next/image`, `favicon.ico`, `pu
 ---
 
 ### M03 — Auth + Roles + JWT Claims
+
 - [x] done
 
 **Agents:** AGENT-DB (DB function), AGENT-APP  
@@ -142,8 +143,6 @@ Proxy config: matcher excludes `_next/static`, `_next/image`, `favicon.ico`, `pu
 - `app/login/page.tsx` — minimal email+password form using Supabase Auth
 
 ---
-
-### M03.5 - simple layout -
 
 ### M04 — Shared Layout + Seed
 
@@ -167,7 +166,7 @@ Components:
 
 ### M05 — Superadmin Panel (Dealer CRUD)
 
-- [ ] done
+- [x] done
 
 **Agents:** AGENT-APP  
 **~2.5h**

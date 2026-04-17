@@ -19,8 +19,11 @@ async function checkAuth(request: NextRequest, allowedRoles: string[]): Promise<
   )
   const { data: { user } } = await supabase.auth.getUser()
   const role = user?.app_metadata?.role
-  if (!role || !allowedRoles.includes(role)) {
+  if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+  if (!role || !allowedRoles.includes(role)) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
   return null
 }

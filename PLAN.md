@@ -87,7 +87,7 @@ End: run `npm run update-types`
 ---
 
 ### M02 — Proxy + Dealer Context
-- [ ] done
+- [x] done
 
 **Agents:** AGENT-APP  
 **~2h**

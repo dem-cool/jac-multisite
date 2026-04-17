@@ -19,7 +19,7 @@ create table public.posts (
   slug text not null,
   body text,
   cover_url text,
-  status text not null default 'draft',
+  status text not null default 'draft' check (status in ('draft', 'published')),
   published_at timestamptz,
   created_at timestamptz default now(),
   unique(dealer_id, slug)
@@ -76,6 +76,15 @@ create table public.submissions (
   created_at timestamptz default now()
 );
 
+-- Indexes on FK columns for multi-tenant query performance
+
+create index on public.posts(dealer_id);
+create index on public.carousel_slides(dealer_id);
+create index on public.promos(dealer_id);
+create index on public.forms(dealer_id);
+create index on public.submissions(dealer_id);
+create index on public.submissions(form_id);
+
 -- Enable RLS on all tables
 
 alter table public.dealers enable row level security;
@@ -87,61 +96,70 @@ alter table public.forms enable row level security;
 alter table public.submissions enable row level security;
 
 -- RLS policies
+-- Claims are stored in app_metadata: auth.jwt() -> 'app_metadata' ->> 'key'
 
--- dealers: superadmin full access
+-- dealers: public read (proxy needs slug lookup), superadmin full access
+create policy "public_read_dealers" on public.dealers
+  for select using (true);
+
 create policy "superadmin_all_dealers" on public.dealers
-  for all using ((auth.jwt() ->> 'role') = 'superadmin');
+  for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin');
 
--- posts: dealer_admin all operations
+-- posts: public read published only, dealer_admin write own
+create policy "public_read_published_posts" on public.posts
+  for select using (status = 'published');
+
 create policy "dealer_admin_all_posts" on public.posts
-  for all using (dealer_id = (auth.jwt() ->> 'dealer_id')::uuid);
+  for all using (dealer_id = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')::uuid);
 
 -- press_notes: public read, superadmin write
 create policy "public_read_press_notes" on public.press_notes
   for select using (true);
 
 create policy "superadmin_write_press_notes" on public.press_notes
-  for all using ((auth.jwt() ->> 'role') = 'superadmin');
+  for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin');
 
--- carousel_slides: dealer_admin all operations
+-- carousel_slides: public read, dealer_admin write own
+create policy "public_read_carousel_slides" on public.carousel_slides
+  for select using (true);
+
 create policy "dealer_admin_all_carousel_slides" on public.carousel_slides
-  for all using (dealer_id = (auth.jwt() ->> 'dealer_id')::uuid);
+  for all using (dealer_id = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')::uuid);
 
--- promos: dealer_admin all operations
+-- promos: public read active only, dealer_admin write own
+create policy "public_read_active_promos" on public.promos
+  for select using (active = true);
+
 create policy "dealer_admin_all_promos" on public.promos
-  for all using (dealer_id = (auth.jwt() ->> 'dealer_id')::uuid);
+  for all using (dealer_id = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')::uuid);
 
 -- forms: dealer_admin all operations
 create policy "dealer_admin_all_forms" on public.forms
-  for all using (dealer_id = (auth.jwt() ->> 'dealer_id')::uuid);
+  for all using (dealer_id = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')::uuid);
 
--- submissions: anon insert, dealer_admin read
+-- submissions: anon insert (validated against form's dealer), dealer_admin read own
 create policy "anon_insert_submissions" on public.submissions
-  for insert with check (true);
+  for insert with check (
+    dealer_id = (select dealer_id from public.forms where id = form_id)
+  );
 
 create policy "dealer_admin_read_submissions" on public.submissions
-  for select using (dealer_id = (auth.jwt() ->> 'dealer_id')::uuid);
+  for select using (dealer_id = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')::uuid);
 
--- Storage bucket
+-- Storage bucket (public so images load on public pages)
 
 insert into storage.buckets (id, name, public)
-values ('dealer-media', 'dealer-media', false)
+values ('dealer-media', 'dealer-media', true)
 on conflict (id) do nothing;
 
 create policy "dealer_media_upload" on storage.objects
   for insert with check (
     bucket_id = 'dealer-media'
-    and (storage.foldername(name))[1] = (auth.jwt() ->> 'dealer_id')
-  );
-
-create policy "dealer_media_read_own" on storage.objects
-  for select using (
-    bucket_id = 'dealer-media'
-    and (storage.foldername(name))[1] = (auth.jwt() ->> 'dealer_id')
+    and (storage.foldername(name))[1] = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')
   );
 
 create policy "dealer_media_delete_own" on storage.objects
   for delete using (
     bucket_id = 'dealer-media'
-    and (storage.foldername(name))[1] = (auth.jwt() ->> 'dealer_id')
+    and (storage.foldername(name))[1] = (auth.jwt() -> 'app_metadata' ->> 'dealer_id')
   );

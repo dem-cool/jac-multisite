@@ -14,7 +14,269 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      carousel_slides: {
+        Row: {
+          created_at: string | null
+          dealer_id: string
+          headline: string | null
+          id: string
+          image_url: string
+          link: string | null
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          dealer_id: string
+          headline?: string | null
+          id?: string
+          image_url: string
+          link?: string | null
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          dealer_id?: string
+          headline?: string | null
+          id?: string
+          image_url?: string
+          link?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_slides_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealers: {
+        Row: {
+          contact_json: Json | null
+          created_at: string | null
+          footer_json: Json | null
+          id: string
+          name: string
+          slug: string
+          tracking_json: Json | null
+        }
+        Insert: {
+          contact_json?: Json | null
+          created_at?: string | null
+          footer_json?: Json | null
+          id?: string
+          name: string
+          slug: string
+          tracking_json?: Json | null
+        }
+        Update: {
+          contact_json?: Json | null
+          created_at?: string | null
+          footer_json?: Json | null
+          id?: string
+          name?: string
+          slug?: string
+          tracking_json?: Json | null
+        }
+        Relationships: []
+      }
+      forms: {
+        Row: {
+          created_at: string | null
+          dealer_id: string
+          fields_json: Json | null
+          id: string
+          name: string
+          recipient_email: string
+        }
+        Insert: {
+          created_at?: string | null
+          dealer_id: string
+          fields_json?: Json | null
+          id?: string
+          name: string
+          recipient_email: string
+        }
+        Update: {
+          created_at?: string | null
+          dealer_id?: string
+          fields_json?: Json | null
+          id?: string
+          name?: string
+          recipient_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forms_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          body: string | null
+          cover_url: string | null
+          created_at: string | null
+          dealer_id: string
+          id: string
+          published_at: string | null
+          slug: string
+          status: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          dealer_id: string
+          id?: string
+          published_at?: string | null
+          slug: string
+          status?: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          dealer_id?: string
+          id?: string
+          published_at?: string | null
+          slug?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      press_notes: {
+        Row: {
+          body: string | null
+          cover_url: string | null
+          created_at: string | null
+          id: string
+          published_at: string | null
+          slug: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          published_at?: string | null
+          slug: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          id?: string
+          published_at?: string | null
+          slug?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      promos: {
+        Row: {
+          active: boolean
+          body: string | null
+          created_at: string | null
+          dealer_id: string
+          hero_url: string | null
+          id: string
+          slug: string
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          body?: string | null
+          created_at?: string | null
+          dealer_id: string
+          hero_url?: string | null
+          id?: string
+          slug: string
+          title: string
+        }
+        Update: {
+          active?: boolean
+          body?: string | null
+          created_at?: string | null
+          dealer_id?: string
+          hero_url?: string | null
+          id?: string
+          slug?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promos_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      submissions: {
+        Row: {
+          created_at: string | null
+          data_json: Json | null
+          dealer_id: string
+          error: string | null
+          form_id: string
+          id: string
+          sent_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_json?: Json | null
+          dealer_id: string
+          error?: string | null
+          form_id: string
+          id?: string
+          sent_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_json?: Json | null
+          dealer_id?: string
+          error?: string | null
+          form_id?: string
+          id?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_dealer_id_fkey"
+            columns: ["dealer_id"]
+            isOneToOne: false
+            referencedRelation: "dealers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

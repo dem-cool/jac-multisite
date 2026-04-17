@@ -61,7 +61,7 @@ M05, M06, M07 can be done in parallel after M04 is complete.
 ## Modules
 
 ### M01 — DB Schema + RLS + Types
-- [ ] done
+- [x] done
 
 **Agents:** AGENT-DB  
 **~3h**

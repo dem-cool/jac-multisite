@@ -183,7 +183,7 @@ Invite: `supabase.auth.admin.inviteUserByEmail(email, { data: { role: 'dealer_ad
 
 ### M06 — Dealer Admin Panel
 
-- [ ] done
+- [x] done
 
 **Agents:** AGENT-APP  
 **~3.5h**

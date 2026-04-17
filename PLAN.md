@@ -147,7 +147,7 @@ Proxy config: matcher excludes `_next/static`, `_next/image`, `favicon.ico`, `pu
 
 ### M04 — Shared Layout + Seed
 
-- [ ] done
+- [x] done
 
 **Agents:** AGENT-DB (seed migration), AGENT-APP  
 **~2h**

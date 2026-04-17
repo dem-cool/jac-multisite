@@ -3,23 +3,19 @@ import type { Database } from '../src/types/supabase'
 
 type DealerRow = Database['public']['Tables']['dealers']['Row']
 
-function getServiceRoleClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase environment variables')
-  }
-
-  return createClient<Database>(supabaseUrl, serviceRoleKey)
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Missing Supabase environment variables')
 }
 
-export async function getDealerBySlug(slug: string): Promise<DealerRow | null> {
-  const supabase = getServiceRoleClient()
+const supabase = createClient<Database>(supabaseUrl, serviceRoleKey)
 
+export async function getDealerBySlug(slug: string): Promise<DealerRow | null> {
   const { data, error } = await supabase
     .from('dealers')
-    .select('*')
+    .select('id, slug, name')
     .eq('slug', slug)
     .single()
 
@@ -27,5 +23,5 @@ export async function getDealerBySlug(slug: string): Promise<DealerRow | null> {
     return null
   }
 
-  return data
+  return data as DealerRow
 }

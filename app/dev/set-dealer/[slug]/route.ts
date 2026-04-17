@@ -10,7 +10,7 @@ export async function GET(
 
   cookieStore.set('__dealer', slug, {
     path: '/',
-    httpOnly: false,
+    httpOnly: true,
     maxAge: 86400,
   })
 
